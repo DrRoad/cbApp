@@ -14,8 +14,8 @@ library(ggplot2)
 
 # function to calculate npv with variable discount rate
 vNPV <- function (drvec, cfvec) {
-    n <- c(0, seq(length(drvec)))
-    drvec <- c(1, drvec)
+    n <- seq(0, length(drvec))
+    drvec <- c(0, drvec)
     pv <- cfvec / ((1+drvec) ^ n)
     return(sum(pv))
 }
@@ -26,21 +26,15 @@ genNPVs_cf <- function (xVec, dr, cfVec) {
     # fixed discount rate
     if (length(dr) == 1) {
         for (i in seq(1, 101))
-            npvVec <- c(
-                npvVec, npv(
-                    dr, c(
-                        cfVec[1], 
-                        cfVec[2:length(cfVec)] * 
-                            (1 + xVec[i]/100))))
+            npvVec <- c(npvVec, npv(
+                dr, 
+                c(cfVec[1], cfVec[2:length(cfVec)] * (1 + xVec[i]/100))))
     # uneven discount rates
     }else{
         for (i in seq(1, 101))
-            npvVec <- c(
-                npvVec, vNPV(
-                    dr, c(
-                        cfVec[1], 
-                        cfVec[2:length(cfVec)] * 
-                            (1 + xVec[i]/100))))
+            npvVec <- c(npvVec, vNPV(
+                dr, 
+                c(cfVec[1], cfVec[2:length(cfVec)] * (1 + xVec[i]/100))))
     }
     return(npvVec)
 }
@@ -51,22 +45,56 @@ genNPVs_dr <- function (xVec, dr, cfVec) {
     # fixed discount rate
     if (length(dr) == 1) {
         for (i in seq(1, 101))
-            npvVec <- c(npvVec, 
-                        npv(dr * (1 + xVec[i]/100), cfVec))
+            npvVec <- c(npvVec, npv(dr * (1 + xVec[i]/100), cfVec))
     # uneven discount rates    
     }else{
         for (i in seq(1, 101))
-            npvVec <- c(npvVec, 
-                        npv(dr * (1 + xVec[i]/100), cfVec))
+            npvVec <- c(npvVec, npv(dr * (1 + xVec[i]/100), cfVec))
     }
     return(npvVec)
 }
 
+# function to generate NPVs for MC
+mcNPVs <- function(randomize, dr, cfVec){
+    randNPVs <- c()
+    for (i in seq(10000)){
+        randCF <- c()
+        randDR <- c()
+        if (randomize$cf[[1]] == TRUE & randomize$cf[[2]] == "normal"){
+            randCF <- cfVec * (1 + rnorm(length(cfVec), 
+                                         sd = as.numeric(randomize$cf[[3]])))
+        }else if (randomize$cf[[1]]){
+            randCF <- cfVec * (1 + runif(length(cfVec), 
+                                         min = as.numeric(randomize$cf[[3]]), 
+                                         max = as.numeric(randomize$cf[[4]])))
+        }else{
+            randCF <- cfVec
+        }
+        if (randomize$r[[1]] == TRUE & randomize$r[[2]] == "normal"){
+            randDR <- dr * (1 + rnorm(length(dr), 
+                                      sd = as.numeric(randomize$r[[3]])
+                ))
+        }else if (randomize$r[[1]]){
+            randDR <- dr * (1 + runif(length(dr), 
+                                      min = as.numeric(randomize$r[[3]]), 
+                                      max = as.numeric(randomize$r[[4]])))
+        }else{
+            randDR <- dr
+        }
+        if (length(randDR) == 1){
+            randNPVs <- c(randNPVs, npv(randDR, randCF))
+        }else{
+            randNPVs <- c(randNPVs, vNPV(randDR, randCF))
+        }
+    }
+    return(randNPVs)
+}
 
 
-######################################################
-####################### UI ###########################
-######################################################
+
+###############################################################################
+################################### UI ########################################
+###############################################################################
 
 ui <- navbarPage(title = "Capital Budgetting App", 
     
@@ -74,18 +102,14 @@ ui <- navbarPage(title = "Capital Budgetting App",
     tabPanel(
         "About",
         h2("Capital Budgetting App"),
-        p("This is an app designed to assist with captial
-          budgetting and performing financial analyses which 
-          may require calculating or estimating net present
-          value (NPV) or the internal rate of return (IRR) 
-          from a series of cash flows.  This app allows the 
-          user to input an initial outlay and up to 20 
-          subsequent cash flows.  Present value of future 
-          cash flows are calculated using either a single 
-          fixed discount rate or different rates for each 
-          period."),
-        p("To use the app, just click on the tabs at the top 
-          of the page.")
+        p("This is an app designed to assist with captial budgetting and 
+          financial analyses which may require calculating or estimating net 
+          present value (NPV) or the internal rate of return (IRR) from a 
+          series of cash flows.  This app allows the user to input an initial 
+          outlay and up to 20 subsequent cash flows.  The present value of 
+          future cash flows is calculated using either a single fixed discount 
+          rate or different rates for each period."),
+        p("To use the app, just click on the tabs at the top of the page.")
     ),
     
 ####### NPV & IRR PANEL #######
@@ -97,33 +121,29 @@ ui <- navbarPage(title = "Capital Budgetting App",
             # number of periods input
                 column(3, 
                     numericInput(
-                        "periods", 
-                        label = "Number of periods", 
+                        "periods", label = "Number of periods", 
                         value = 5, min = 1, max = 10)
                     ),
 
             # discount rate type radio buttons
                 column(3, 
                        radioButtons(
-                           "discount_type", 
-                           label = "Type of discount rate", 
-                           choices = list(
-                               "fixed" = 0, 
-                               "variable" = 1), 
-                           selected = 0)),
+                           "discount_type", label = "Type of discount rate", 
+                           choices = list("fixed" = 0, "variable" = 1), 
+                           selected = 0)
+                       ),
             
             # input for fixed discount rate (dependent ui)
                 column(3, 
                        uiOutput("fixed_dr")
-                       )
-            )),
+                       ))
+            ),
         hr(),
         h4("Enter net cash flows for each period"), 
         
         # cash flow inputs (dependent ui)
         fluidRow(
-            column(2, textInput("cf_0", label = "t = 0", 
-                                value = 0)),
+            column(2, textInput("cf_0", label = "t = 0", value = 0)),
             column(2, uiOutput("cf1")), 
             column(2, uiOutput("cf2")), 
             column(2, uiOutput("cf3")), 
@@ -161,8 +181,7 @@ ui <- navbarPage(title = "Capital Budgetting App",
         
         # Calculate button and NPV and IRR outputs
         fluidRow(
-            column(3, actionButton("calc", 
-                                   label = "Calculate")),
+            column(3, actionButton("calc", label = "Calculate")),
             column(3, textOutput("npv")),
             column(3, textOutput("irr"))
         )
@@ -175,23 +194,23 @@ ui <- navbarPage(title = "Capital Budgetting App",
             fluidRow(
                 column(3, 
                     selectInput(
-                        "saType", 
-                        "Choose the indepedent variable", 
-                        choices = c("Cash Flows", 
-                                    "Discount Rate(s)"))),
-                column(9,
+                        "saType", "Choose the indepedent variable", 
+                        choices = c("Cash Flows", "Discount Rate(s)")
+                        )
+                    ),
+                column(9, 
                        sliderInput(
-                        "varRange", 
-                        "Choose the range of variation (%)",
-                        min = -100, max = 100, 
-                        value = c(-40, 40)
-                )))),
+                           "varRange", "Choose the range of variation (%)", 
+                           min = -100, max = 100, value = c(-40, 40)
+                           )
+                       )
+                )
+            ),
         fluidRow(
             column(3,
-                  actionButton(
-                      "createPlot",
-                      label = "Create Plot"))
-        ),
+                  actionButton("createPlot", label = "Create Plot")
+                  )
+            ),
         plotOutput("saPlot")
         ),
 
@@ -201,72 +220,70 @@ ui <- navbarPage(title = "Capital Budgetting App",
         wellPanel(
             fluidRow(
                 column(2,
-                       h5("Variables"),
-                       checkboxInput("cfVar", 
-                                     label = "cash flows")
+                       h5("Variables"), 
+                       checkboxInput("cfVar", label = "cash flows")
                        ),
                 column(3, 
                        selectInput(
-                           "cfDist", 
-                           label = h5("Distribution"), 
-                           choices = list(
-                               "normal", "uniform"))
+                           "cfDist", label = h5("Distribution"), 
+                           choices = list("normal", "uniform")
+                           )
                        ),
                 column(3, 
                        numericInput(
-                           "cfSD", 
-                           label = h5("Standard Deviation"), 
-                           value = 1.00, min = -6.00, 
-                           max = 6.00, step = 0.01
-                       ))
+                           "cfSD", label = h5("Standard Deviation"), 
+                           value = 0.25, min = 0, max = 1, step = 0.01
+                           )
+                       )
             ), 
             fluidRow(
                 column(2,
-                       h1(""),
-                       checkboxInput("drVar", 
-                                     label = "discount rate")
+                       h1(""), 
+                       checkboxInput("drVar", label = "discount rate")
                 ),
                 column(3, 
                        selectInput(
                            "drDist", label = "", 
-                           choices = list(
-                               "normal", "uniform"))
+                           choices = list("normal", "uniform")
+                           )
                 ),
                 column(3, 
                        numericInput(
-                           "drSD", label = "", value = 1.00, 
-                           min = -6.00, max = 6.00, 
-                           step = 0.01
-                       ))
+                           "drSD", label = "", value = 0.25, min = 0, 
+                           max = 1, step = 0.01
+                           )
+                       )
             ), 
             fluidRow(
                 column(2,
                        h1(""),
-                       checkboxInput("gVar", 
-                                     label = "growth rate")
+                       checkboxInput(
+                           "gVar", 
+                           label = "growth rate\n(currently unavailable)"
+                           )
                 ),
                 column(3, 
                        selectInput(
                            "gDist", label = "", 
-                           choices = list(
-                               "normal", "uniform"))
+                           choices = list("normal", "uniform")
+                           )
                 ),
                 column(3, 
                        numericInput(
-                           "gSD", label = "", value = 1.00, 
-                           min = -6.00, max = 6.00, 
-                           step = 0.01
-                       ))
+                           "gSD", label = "", value = 0.25, min = 0, 
+                           max = 1, step = 0.01
+                           )
+                       )
             ) 
         ),
         sidebarLayout(
             sidebarPanel(
+                actionButton("doMC", label = "Run Simulations"),
                 checkboxGroupInput(
-                    "mcLines", 
-                    label = "Add Lines", 
+                    "mcLines", label = "Add Lines", 
                     choices = list(
-                        "mean", "median", "mid 60%", 
-                        "mid 80%", "mid 90%"))
+                        "mean", "median", "mid 60%", "mid 80%", "mid 90%")
+                    )
             ), 
             mainPanel(
                 plotOutput("mcPlot")
@@ -276,9 +293,9 @@ ui <- navbarPage(title = "Capital Budgetting App",
 )
 
 
-##########################################################
-####################### SERVER ###########################
-##########################################################
+###############################################################################
+################################# SERVER ######################################
+###############################################################################
 
 server <- function(input, output) {
     
@@ -286,8 +303,7 @@ server <- function(input, output) {
     # numeric ui input for fixed discount rate
     output$fixed_dr <- renderUI({
         if (input$discount_type == 0)
-            numericInput(inputId = "discount",
-                         label = "Enter discount rate",
+            numericInput(inputId = "discount", label = "Enter discount rate",
                          value = 0.00)
     })
     
@@ -389,32 +405,28 @@ server <- function(input, output) {
     # create reactive functions to generate vectors
     # of cash flows and discount rates
     cf_vector <- reactive({
-        c(input$cf_0, input$cf_1, input$cf_2, input$cf_3, 
-           input$cf_4, input$cf_5, input$cf_6, input$cf_7, 
-           input$cf_8, input$cf_9, 
-           input$cf_10)[1:(input$periods+1)]})
+        c(input$cf_0, input$cf_1, input$cf_2, input$cf_3, input$cf_4, 
+          input$cf_5, input$cf_6, input$cf_7, input$cf_8, input$cf_9, 
+          input$cf_10)[1:(input$periods+1)]
+        })
 
     vdr_vector <- reactive({
-        c(input$dr_1, input$dr_2, input$dr_3, input$dr_4, 
-          input$dr_5, input$dr_6, input$dr_7, input$dr_8, 
-          input$dr_9, input$dr_10)[1:input$periods]
-    })
+        c(input$dr_1, input$dr_2, input$dr_3, input$dr_4, input$dr_5, 
+          input$dr_6, input$dr_7, input$dr_8, input$dr_9, 
+          input$dr_10)[1:input$periods]
+        })
     
     # reactive expressions for calculating NPV and IRR
     npv_result <- eventReactive(input$calc, {
         if (input$discount_type == 0) {
             # fixed discount rate
-            npv(r = input$discount, 
-                cf = as.numeric(cf_vector()))
+            npv(r = input$discount, cf = as.numeric(cf_vector()))
         }else{
             # variable discount rate
-            vNPV(as.numeric(vdr_vector()), 
-                 as.numeric(cf_vector()))
+            vNPV(as.numeric(vdr_vector()), as.numeric(cf_vector()))
         }
     })
-    irr_result <- eventReactive(input$calc, {
-        irr(as.numeric(cf_vector()))
-    })
+    irr_result <- eventReactive(input$calc, {irr(as.numeric(cf_vector()))})
 
     # NPV and IRR outputs
     output$npv <- renderText({npv_result()})
@@ -422,33 +434,28 @@ server <- function(input, output) {
     
 ####### SCENARIO ANALYSIS #######
     # create vector of x values
-    x_vec <- reactive({input$varRange[1] + 
-        ((input$varRange[2] - input$varRange[1]) / 100) * 
-        seq(0, 100)})
+    x_vec <- reactive({
+        input$varRange[1] + ((input$varRange[2] - input$varRange[1]) / 100) * 
+            seq(0, 100)
+        })
     # create vector of y values
     y_vec <- eventReactive(
         input$createPlot, {
-            if (input$saType == "Cash Flows" & 
-                input$discount_type == 0) {
+            if (input$saType == "Cash Flows" & input$discount_type == 0){
                 # fixed discount rate 
-                genNPVs_cf(as.numeric(x_vec()), 
-                           input$discount, 
+                genNPVs_cf(as.numeric(x_vec()), input$discount, 
                            as.numeric(cf_vector()))
             }else if (input$saType == "Cash Flows"){
                 # variable discount rate
-                genNPVs_cf(as.numeric(x_vec()),
-                           as.numeric(vdr_vector()),
+                genNPVs_cf(as.numeric(x_vec()), as.numeric(vdr_vector()),
                            as.numeric(cf_vector()))
-            }else if (input$saType != "Cash Flows" & 
-                      input$discount_type == 0) {
+            }else if (input$saType != "Cash Flows" & input$discount_type == 0){
                 # fixed discount rate
-                genNPVs_dr(as.numeric(x_vec()), 
-                           input$discount, 
+                genNPVs_dr(as.numeric(x_vec()), input$discount, 
                            as.numeric(cf_vector()))
             }else{
                 # variable discount rate
-                genNPVs_dr(as.numeric(x_vec()),
-                           as.numeric(vdr_vector()),
+                genNPVs_dr(as.numeric(x_vec()), as.numeric(vdr_vector()),
                            as.numeric(cf_vector()))
             }
         })
@@ -460,17 +467,35 @@ server <- function(input, output) {
         y <- as.numeric(y_vec())
         df <- data.frame(x, y)
         p <- ggplot(df, aes(x = x, y = y)) + 
-            geom_line(color = "green3", size = 3, 
-                      show.legend = FALSE) + 
-            geom_hline(yintercept = 0) + 
-            geom_vline(xintercept = 0)
-        p + labs(list(
-            title = paste("NPV for Varying Levels of", 
-                          isolate({input$saType})), 
-            x = "Percent Change from Original Values", 
-            y = "NPV"))
+            geom_line(color = "green3", size = 3, show.legend = FALSE) + 
+            geom_hline(yintercept = 0) + geom_vline(xintercept = 0)
+        p + labs(
+            list(
+                title = paste(
+                    "NPV for Varying Levels of", isolate({input$saType})
+                    ), 
+                x = "Percent Change from Original Values", y = "NPV"
+                )
+            )
         })
+    # create plot from Monte Carlo output
+    runMC <- eventReactive(input$doMC, {
+        randolist <- list(
+            "cf" = c(input$cfVar, input$cfDist, input$cfSD),
+            "r" = c(input$drVar, input$drDist, input$drSD)
+            )
+        if (input$discount_type == 0){
+            mcNPVs(randolist, as.numeric(input$discount), 
+                   as.numeric(cf_vector()))
+        }else{
+            mcNPVs(randolist, vdr_vector(), as.numeric(cf_vector()))
+        }
+    })
     
+    output$mcPlot <- renderPlot({
+        p <- ggplot(data.frame("NPV" = runMC()), aes(NPV))
+        p + geom_histogram(color = "gray30", fill = "orangered1")
+    })
 }
 
 shinyApp(ui = ui, server = server)
