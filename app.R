@@ -51,13 +51,13 @@ genNPVs_dr <- function (xVec, dr, cfVec) {
     }else{
         for (i in seq(1, 101))
             npvVec <- c(npvVec, vNPV(dr * (1 + xVec[i]/100), cfVec))
-        print(npvVec)
     }
     return(npvVec)
 }
 
 # function to generate NPVs for MC
 mcNPVs <- function(randomize, dr, cfVec){
+    print("Running MC")
     randNPVs <- c()
     for (i in seq(10000)){
         randCF <- c()
@@ -224,13 +224,13 @@ ui <- navbarPage(title = "Capital Budgetting App",
             fluidRow(
                 column(3, 
                     selectInput(
-                        "saType", "Choose the indepedent variable", 
+                        "saType", div("Choose the variable", class = "text-info"), 
                         choices = c("Cash Flows", "Discount Rate(s)")
                         )
                     ),
                 column(9, 
                        sliderInput(
-                           "varRange", "Choose the range of variation (%)", 
+                           "varRange", div("Choose the range of variation (%)", class = "text-success"), 
                            min = -100, max = 100, value = c(-40, 40)
                            )
                        )
@@ -238,9 +238,9 @@ ui <- navbarPage(title = "Capital Budgetting App",
             ),
         fluidRow(
             column(2,
-                  actionButton("createPlot", label = "Create Plot")),
+                  actionButton("createPlot", label = "Create Plot", class = "btn-primary")),
             column(3,
-                  downloadButton("saDownload", label = "Download Plot")
+                  downloadButton("saDownload", label = "Download Plot", class = "btn-warning")
                   )
             ),
         plotOutput("saPlot")
@@ -252,10 +252,13 @@ ui <- navbarPage(title = "Capital Budgetting App",
         wellPanel(
             div(style = "margin-top:0px", fluidRow(
                 column(2, div(style = "height:5px;margin-top:0px", 
+                              class = "text-info",
                               p("Variables", style = "font-weight:bold"))), 
-                column(3, div(style = "height:5px;margin-top:0px", 
+                column(3, div(style = "height:5px;margin-top:0px",
+                              class = "text-success",
                               p("Distribution", style = "font-weight:bold"))),
                 column(3, div(style = "height:5px;margin-top:0px", 
+                              class = "text-success",
                               p("Dispersion", style = "font-weight:bold")))
             )),
             fluidRow(
@@ -315,17 +318,19 @@ ui <- navbarPage(title = "Capital Budgetting App",
         sidebarLayout(
             sidebarPanel(
                 checkboxGroupInput(
-                    "mcLines", label = "Add Lines and Shading", 
+                    "mcLines", label = div("Add Lines and Shading", class = "text-info"), 
                     choices = list(
                         "mean", "median", "mid 60%", "mid 80%", "mid 90%")
                     ),
                 h1(""),
-                actionButton("doMC", label = "Run Simulations"),
+                actionButton("doMC", label = "Run Simulations", class = "btn-primary"),
                 h1(""),
-                downloadButton("mcDownload", label = "Download Plot")
+                downloadButton("mcDownload", label = "Download Plot", class = "btn-warning")
             ), 
             mainPanel(
-                plotOutput("mcPlot")
+                plotOutput("mcPlot"), 
+                p("Summary Information"),
+                verbatimTextOutput("mcSummary")
             )
         )
     )
@@ -754,88 +759,171 @@ server <- function(input, output) {
         }
     })
     
-    # reactive expression to create Monte Carlo Plot
-    makeMCplot <- reactive({
+#     # reactive expression to create Monte Carlo Plot
+#     makeMCplot <- reactive({
+#         call_idx <- 1
+#         calls <- list()
+#         if ("mean" %in% isolate({input$mcLines}))
+#             calls[[call_idx]] <- geom_vline(xintercept = mean(runMC()),
+#                                             size = 2)
+#             call_idx = call_idx + 1
+#         if ("median" %in% isolate({input$mcLines}))
+#             calls[[call_idx]] <- geom_vline(xintercept = median(runMC()),
+#                                             color = "green", 
+#                                             size = 2)
+#             call_idx <- call_idx + 1
+#         if ("mid 60%" %in% isolate({input$mcLines})){
+#             q20 <- quantile(runMC(), 0.2)
+#             q80 <- quantile(runMC(), 0.8)
+#             mcDens <- density(runMC())
+#             dfMCdens <- data.frame(x = mcDens$x, y = mcDens$y)
+#             calls[[call_idx]] <- geom_area(
+#                 alpha = 0.5, data = subset(dfMCdens, x >= q20 & x <= q80), 
+#                 aes(x = x, y = y), color = "grey", fill = "skyblue3") #+ geom_vline(xintercept = q20, color = "green", linetype = "dashed") + geom_vline(xintercept = q80, color = "green", linetype = "dashed")
+#             call_idx <- call_idx + 1}
+#         if ("mid 80%" %in% isolate({input$mcLines})){
+#             q10 <- quantile(runMC(), 0.1)
+#             q90 <- quantile(runMC(), 0.9)
+#             mcDens <- density(runMC())
+#             dfMCdens <- data.frame(x = mcDens$x, y = mcDens$y)
+#             calls[[call_idx]] <- geom_area(alpha = 0.5,
+#                 data = subset(dfMCdens, x >= q10 & x <= q90), 
+#                 aes(x = x, y = y),
+#                 color = "grey", 
+#                 fill = "skyblue2")
+#             call_idx <- call_idx + 1}
+#         if ("mid 90%" %in% isolate({input$mcLines})){
+#             q05 <- quantile(runMC(), 0.05)
+#             q95 <- quantile(runMC(), 0.95)
+#             mcDens <- density(runMC())
+#             dfMCdens <- data.frame(x = mcDens$x, y = mcDens$y)
+#             calls[[call_idx]] <- geom_area(alpha = 0.5,
+#                 data = subset(dfMCdens, x >= q05 & x <= q95), 
+#                 aes(x = x, y = y), 
+#                 color = "grey", 
+#                 fill = "skyblue")
+#             call_idx <- call_idx + 1}
+#         if (length(calls) == 0){
+#             p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) + theme_bw() +
+#                       labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
+#                       geom_density(fill = "skyblue", color = "grey", 
+#                                    alpha = 0.3)
+#         }else if (length(calls) == 1){
+#             p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) + theme_bw() +
+#                       labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
+#                       geom_density(fill = "skyblue", color = "grey", 
+#                                    alpha = 0.3) + calls[[1]]
+#         }else if (length(calls) == 2){
+#             p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) + theme_bw() +
+#                       labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
+#                       geom_density(fill = "skyblue", color = "grey", 
+#                                    alpha = 0.3) + calls[[2]] + calls[[1]]
+#         }else if (length(calls) == 3){
+#             p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) + theme_bw() +
+#                       labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
+#                       geom_density(fill = "skyblue", color = "grey", 
+#                                    alpha = 0.3) + 
+#                       calls[[3]] + calls[[2]] + calls[[1]]
+#         }else if (length(calls) == 4){
+#             p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) + theme_bw() +
+#                       labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
+#                       geom_density(fill = "skyblue", color = "grey",  
+#                                    alpha = 0.3) + 
+#                       calls[[4]] + calls[[3]] + calls[[2]] + calls[[1]]
+#         }else if (length(calls) == 5){
+#             p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) + theme_bw() +
+#                       labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
+#                       geom_density(fill = "skyblue", color = "grey", 
+#                                    alpha = 0.3) + 
+#                       calls[[5]] + calls[[4]] + calls[[3]] + calls[[2]] + 
+#                       calls[[1]]}
+#         return(p)
+#     })
+    
+    # make list of calls for MC plot
+    mcPlotCalls <- reactive({
         call_idx <- 1
         calls <- list()
-        if ("mean" %in% isolate({input$mcLines}))
+        if ("mean" %in% input$mcLines)
             calls[[call_idx]] <- geom_vline(xintercept = mean(runMC()),
                                             size = 2)
-            call_idx = call_idx + 1
-        if ("median" %in% isolate({input$mcLines}))
+        call_idx = call_idx + 1
+        if ("median" %in% input$mcLines)
             calls[[call_idx]] <- geom_vline(xintercept = median(runMC()),
                                             color = "green", 
                                             size = 2)
-            call_idx <- call_idx + 1
-        if ("mid 60%" %in% isolate({input$mcLines})){
+        call_idx <- call_idx + 1
+        if ("mid 60%" %in% input$mcLines){
             q20 <- quantile(runMC(), 0.2)
             q80 <- quantile(runMC(), 0.8)
             mcDens <- density(runMC())
             dfMCdens <- data.frame(x = mcDens$x, y = mcDens$y)
-            calls[[call_idx]] <- geom_area(alpha = 0.9,
-                data = subset(dfMCdens, x >= q20 & x <= q80), 
-                aes(x = x, y = y), 
-                fill = "red")
-            call_idx <- call_idx + 1}
-        if ("mid 80%" %in% isolate({input$mcLines})){
+            calls[[call_idx]] <- geom_vline(
+                xintercept = q20, color = "orange", linetype = "dashed") 
+            call_idx <- call_idx + 1
+            calls[[call_idx]] <- geom_vline(
+                xintercept = q80, color = "orange", linetype = "dashed")
+            call_idx = call_idx + 1
+            calls[[call_idx]] <- geom_area(
+                alpha = 0.5, data = subset(dfMCdens, x >= q20 & x <= q80), 
+                aes(x = x, y = y), color = "grey", fill = "skyblue3") 
+            call_idx <- call_idx + 1
+            }
+        if ("mid 80%" %in% input$mcLines){
             q10 <- quantile(runMC(), 0.1)
             q90 <- quantile(runMC(), 0.9)
             mcDens <- density(runMC())
             dfMCdens <- data.frame(x = mcDens$x, y = mcDens$y)
-            calls[[call_idx]] <- geom_area(alpha = 0.7,
-                data = subset(dfMCdens, x >= q10 & x <= q90), 
-                aes(x = x, y = y), 
-                fill = "blue")
+            calls[[call_idx]] <- geom_vline(
+                xintercept = q10, color = "orange", linetype = "dashed") 
+            call_idx <- call_idx + 1
+            calls[[call_idx]] <- geom_vline(
+                xintercept = q90, color = "orange", linetype = "dashed")
+            call_idx = call_idx + 1
+            calls[[call_idx]] <- geom_area(
+                alpha = 0.5, data = subset(dfMCdens, x >= q10 & x <= q90), 
+                aes(x = x, y = y), color = "grey", fill = "skyblue2")
             call_idx <- call_idx + 1}
-        if ("mid 90%" %in% isolate({input$mcLines})){
+        if ("mid 90%" %in% input$mcLines){
             q05 <- quantile(runMC(), 0.05)
             q95 <- quantile(runMC(), 0.95)
             mcDens <- density(runMC())
             dfMCdens <- data.frame(x = mcDens$x, y = mcDens$y)
-            calls[[call_idx]] <- geom_area(alpha = 0.5,
-                data = subset(dfMCdens, x >= q05 & x <= q95), 
-                aes(x = x, y = y), 
-                fill = "darkorchid1")
+            calls[[call_idx]] <- geom_vline(
+                xintercept = q05, color = "orange", linetype = "dashed") 
+            call_idx <- call_idx + 1
+            calls[[call_idx]] <- geom_vline(
+                xintercept = q95, color = "orange", linetype = "dashed")
+            call_idx = call_idx + 1
+            calls[[call_idx]] <- geom_area(
+                alpha = 0.5, data = subset(dfMCdens, x >= q05 & x <= q95), 
+                aes(x = x, y = y), color = "grey", fill = "skyblue")
             call_idx <- call_idx + 1}
-        if (length(calls) == 0){
-            p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) +
-                      labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
-                      geom_density(color = "black", fill = "cyan3", 
-                                   alpha = 0.5)
-        }else if (length(calls) == 1){
-            p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) +
-                      labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
-                      geom_density(color = "black", fill = "cyan3", 
-                                   alpha = 0.5) + calls[[1]]
-        }else if (length(calls) == 2){
-            p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) +
-                      labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
-                      geom_density(color = "black", fill = "cyan3", 
-                                   alpha = 0.5) + calls[[1]] + calls[[2]]
-        }else if (length(calls) == 3){
-            p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) +
-                      labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
-                      geom_density(color = "black", fill = "cyan3", 
-                                   alpha = 0.5) + 
-                      calls[[1]] + calls[[2]] + calls[[3]]
-        }else if (length(calls) == 4){
-            p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) +
-                      labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
-                      geom_density(color = "black", fill = "cyan3", 
-                                   alpha = 0.5) + 
-                      calls[[1]] + calls[[2]] + calls[[3]] + calls[[4]]
-        }else if (length(calls) == 5){
-            p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) +
-                      labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
-                      geom_density(color = "black", fill = "cyan3", 
-                                   alpha = 0.5) + 
-                      calls[[1]] + calls[[2]] + calls[[3]] + calls[[4]] + 
-                      calls[[5]]}
-        return(p)
+        return(calls)
     })
+    
+    # generate MC plot
+    makeMCplot <- reactive({
+        p <- ggplot(data.frame("NPV" = runMC()), aes(NPV)) + theme_bw() +
+            labs(title = "Density Plot of NPVs for 10,000 Simulations") + 
+            geom_density(fill = "skyblue", color = "grey", alpha = 0.3)
+        if (length(mcPlotCalls()) < 1){
+            return(p)
+        }else{
+            for (idx in seq(length(mcPlotCalls()), 1)){
+                print(mcPlotCalls()[[idx]])
+                p <- p + mcPlotCalls()[[idx]]
+            }
+            return(p)
+            }
+        })
+    
     
     # Render Monte Carlo Plot
     output$mcPlot <- renderPlot({makeMCplot()})
+    
+    # Output summary data
+    output$mcSummary <- renderPrint({summary(runMC())})
     
     # Export Monte Carlo Plot as PNG
     output$mcDownload <- downloadHandler(
