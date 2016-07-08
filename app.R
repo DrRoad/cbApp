@@ -13,6 +13,14 @@ library(shiny)
 library(ggplot2)
 library(shinythemes)
 
+# URLs
+CBurl = paste0("http://www.investopedia.com/terms/c/capitalbudgeting.asp?", 
+          "layout=infini&v=5F&adtest=5F&ato=0")
+NPVurl = paste0("http://www.investopedia.com/terms/n/npv.asp?", 
+                "layout=infini&v=5F&orig=1&adtest=5F")
+IRRurl = paste0("http://www.investopedia.com/terms/i/irr.asp?", 
+                "layout=infini&v=5F&orig=1&adtest=5F")
+
 # function to calculate npv with variable discount rate
 vNPV <- function (drvec, cfvec) {
     n <- seq(0, length(drvec))
@@ -57,7 +65,6 @@ genNPVs_dr <- function (xVec, dr, cfVec) {
 
 # function to generate NPVs for MC
 mcNPVs <- function(randomize, dr, cfVec){
-    print("Running MC")
     randNPVs <- c()
     for (i in seq(10000)){
         randCF <- c()
@@ -100,21 +107,58 @@ mcNPVs <- function(randomize, dr, cfVec){
 ################################### UI ########################################
 ###############################################################################
 
-ui <- navbarPage(title = "Capital Budgetting App", 
+ui <- navbarPage(title = "Capital Budgeting App", 
                  theme = shinytheme("flatly"), 
 
 ####### ABOUT PANEL #######
     tabPanel(
         "About",
-        h2("Capital Budgetting App", class = "text-warning"),
-        p("This is an app designed to assist with captial budgetting and 
-          financial analyses which may require calculating or estimating net 
-          present value (NPV) or the internal rate of return (IRR) from a 
-          series of cash flows.  This app allows the user to input an initial 
-          outlay and up to 20 subsequent cash flows.  The present value of 
-          future cash flows is calculated using either a single fixed discount 
-          rate or different rates for each period."),
-        p("To use the app, just click on the tabs at the top of the page.")
+        h2("Capital Budgeting App", class = "text-warning"),
+        p("This is an app designed to assist with", a(
+          href = CBurl, 
+          "captial budgeting", class = "text-info"), "and other financial 
+          analyses which may require calculating or estimating", a(
+          href = NPVurl, 
+          "net present value (NPV)", class = "text-info"), "or the", a(
+          href = IRRurl, 
+          "internal rate of return (IRR)", class = "text-info"), "from a series 
+          of cash flows.  This 
+          app allows the user to input an initial outlay and up to 20 uneven 
+          cash flows in subsequent periods.  The present value of future cash 
+          flows can be calculated using either a single fixed discount rate or 
+          different rates for each period."),
+        p("To navigate the app, just click on the tabs at the top of the page. 
+          Each tab brings you to a panel containing new tools to suit your 
+          analytical needs."),
+        h4("NPV/IRR", class = "text-success"),
+        p("Start at the NPV/IRR panel.  Choose the number of periods, select
+          the type of discount rate and enter values to calculate an initial
+          NPV and IRR."), 
+        h4("Scenario Analysis", class = "text-success"),
+        p("In the Scenario Analysis panel, you can see what your NPV would be 
+          across a range of possible changes in either cash flows or discount 
+          rates.  Both fixed and variable discount rates, as well as uneven 
+          cash flows will work here, but the change expressed at each 
+          point in the plot is applied consistently across all discount rate 
+          values or cash flows after the initial outlay (t=0).  If you wish 
+          to keep a copy of the plot, press the 'Download Plot' button"), 
+        h4("Monte Carlo", class = "text-success"),
+        p(a(href = "https://en.wikipedia.org/wiki/Monte_Carlo_method", "Monte 
+          Carlo analysis", class = "text-info"), "is a technique which 
+          involves running numerous randomized simulations in an attempt to 
+          understand the distribution of potential outcomes.  The Monte Carlo 
+          panel provides a tool for this type of analysis. Upon execution, the 
+          server runs 10,000 simulations using the original cash flow and 
+          discount rate inputs which have been randomly altered according to 
+          the distribution and dispersion parameters specified.  The NPV is 
+          calculated for each trial and the final collection of NPVs is 
+          returned and expressed as a density plot.  As in the Scenario 
+          Analysis panel, there is a button to download the plot here, too."),
+        h4("Future Development", class = "text-danger"),
+        p("This app is still under development.  Some features may appear in 
+          the user interface which are not currently supported.  More features 
+          will be added in the (hopefully) near-ish future to expand 
+          functionality.")
     ),
     
 ####### NPV & IRR PANEL #######
@@ -126,14 +170,16 @@ ui <- navbarPage(title = "Capital Budgetting App",
             # number of periods input
                 column(3, 
                     numericInput(
-                        "periods", label = div("Number of periods", class = "text-info"), 
+                        "periods", label = div("Number of periods", 
+                                               class = "text-info"), 
                         value = 5, min = 1, max = 20)
                     ),
 
             # discount rate type radio buttons
                 column(3, 
                        radioButtons(
-                           "discount_type", label = div("Type of discount rate", class = "text-success"),
+                           "discount_type", label = div(
+                               "Type of discount rate", class = "text-success"),
                            choices = list("fixed" = 0, "variable" = 1), 
                            selected = 0)
                        ),
@@ -211,7 +257,8 @@ ui <- navbarPage(title = "Capital Budgetting App",
         
         # Calculate button and NPV and IRR outputs
         fluidRow(
-            column(3, actionButton("calc", label = "Calculate", class = "btn-primary")),
+            column(3, actionButton("calc", label = "Calculate", 
+                                   class = "btn-primary")),
             column(3, textOutput("npv")),
             column(3, textOutput("irr"))
         )
@@ -224,13 +271,15 @@ ui <- navbarPage(title = "Capital Budgetting App",
             fluidRow(
                 column(3, 
                     selectInput(
-                        "saType", div("Choose the variable", class = "text-info"), 
+                        "saType", div("Choose the variable", 
+                                      class = "text-info"), 
                         choices = c("Cash Flows", "Discount Rate(s)")
                         )
                     ),
                 column(9, 
                        sliderInput(
-                           "varRange", div("Choose the range of variation (%)", class = "text-success"), 
+                           "varRange", div("Choose the range of variation (%)", 
+                                           class = "text-success"), 
                            min = -100, max = 100, value = c(-40, 40)
                            )
                        )
@@ -238,9 +287,11 @@ ui <- navbarPage(title = "Capital Budgetting App",
             ),
         fluidRow(
             column(2,
-                  actionButton("createPlot", label = "Create Plot", class = "btn-primary")),
+                  actionButton("createPlot", label = "Create Plot", 
+                               class = "btn-primary")),
             column(3,
-                  downloadButton("saDownload", label = "Download Plot", class = "btn-warning")
+                  downloadButton("saDownload", label = "Download Plot", 
+                                 class = "btn-warning")
                   )
             ),
         plotOutput("saPlot"),
@@ -326,14 +377,17 @@ ui <- navbarPage(title = "Capital Budgetting App",
         sidebarLayout(
             sidebarPanel(
                 checkboxGroupInput(
-                    "mcLines", label = div("Add Lines and Shading", class = "text-info"), 
+                    "mcLines", label = div("Add Lines and Shading", 
+                                           class = "text-info"), 
                     choices = list(
                         "mean", "median", "mid 50%", "mid 80%", "mid 95%")
                     ),
                 h1(""),
-                actionButton("doMC", label = "Run Simulations", class = "btn-primary"),
+                actionButton("doMC", label = "Run Simulations", 
+                             class = "btn-primary"),
                 h1(""),
-                downloadButton("mcDownload", label = "Download Plot", class = "btn-warning")
+                downloadButton("mcDownload", label = "Download Plot", 
+                               class = "btn-warning")
             ), 
             mainPanel(
                 plotOutput("mcPlot"), 
@@ -355,7 +409,8 @@ server <- function(input, output) {
     # numeric ui input for fixed discount rate
     output$fixed_dr <- renderUI({
         if (input$discount_type == 0)
-            numericInput(inputId = "discount", label = div("Enter discount rate", class = "text-success"),
+            numericInput(inputId = "discount", label = div(
+                "Enter discount rate", class = "text-success"),
                          value = 0.00)
     })
     
@@ -640,7 +695,7 @@ server <- function(input, output) {
         x <- as.numeric(isolate({x_vec()}))
         y <- as.numeric(y_vec())
         df <- data.frame(x, y)
-        p <- ggplot(df, aes(x = x, y = y)) + theme_bw() +
+        p <- ggplot(df, aes(x = x, y = y)) + theme_bw() + 
             geom_line(
                 color = "orchid", size = 2, alpha = 0.7, 
                 show.legend = FALSE) + 
@@ -665,7 +720,8 @@ server <- function(input, output) {
     output$saDownload <- downloadHandler(
         filename = "saPlot.png", 
         content = function(file) {
-            ggsave(file, plot = makeSAplot(), device = "png")
+            ggsave(file, plot = makeSAplot(), height = 3.5, width = 5.5, 
+                   dpi = 100)
         }
     )
     
@@ -862,7 +918,6 @@ server <- function(input, output) {
             return(p)
         }else{
             for (idx in seq(length(mcPlotCalls()), 1)){
-                print(mcPlotCalls()[[idx]])
                 p <- p + mcPlotCalls()[[idx]]
             }
             p <- p + scale_color_manual(values = c(
@@ -893,7 +948,8 @@ server <- function(input, output) {
     output$mcDownload <- downloadHandler(
         filename = "mcPlot.png", 
         content = function(file) {
-            ggsave(file, plot = makeMCplot(), device = "png")
+            ggsave(file, plot = makeMCplot(), height = 3.5, width = 6, 
+                   dpi = 100)
         }
     )
 }
