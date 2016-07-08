@@ -1,2 +1,5 @@
 #folder created when app deployed on shinyapps
 rsconnect/
+
+#example plots from app
+*.png
